@@ -159,22 +159,23 @@ function sheet(){const e=EX.find(x=>x.id==op),t=tgt(e),g=got(ds(0),e.id);
  <div class="card"><b>Kaise karein (${e.m})</b>${fig(e.p)}<ol>${e.st.map(s=>`<li>${s}</li>`).join('')}</ol><div class="mu">💡 ${e.tip}</div></div>`;ui()}
 function ui(){const s=$('#st'),c=$('#ct');if(!c)return;
  const B=(f,t,g)=>`<button ${g?'class="g"':''} onclick="${f}">${t}</button>`;
+ if(ld){s.textContent='⏳ Pose model load ho raha hai (pehli baar 10-20 sec)…';c.innerHTML='';return}
  if(ph==0){s.textContent='Camera band hai';c.innerHTML=B('cam()','📷 Camera shuru karo')}
- else if(ph==1){s.textContent='Pehle frame se bahar jao, phir Calibrate dabao';c.innerHTML=B('cal0()','🎯 Calibrate')+B('sw()','🔄',1)}
+ else if(ph==1){s.textContent=(plErr?'⚠️ Pose model nahi mila (internet?), simple mode. ':'')+'Pehle frame se bahar jao, phir Calibrate dabao';c.innerHTML=B('cal0()','🎯 Calibrate')+B('sw()','🔄',1)}
  else if(ph==2){c.innerHTML=''}
- else if(ph==3){s.textContent='Calibrate ho gaya ✅ Ab frame me aao, position lo';c.innerHTML=B('go()','▶ Start')+B('cal0()','Re-calibrate',1)}
+ else if(ph==3){s.textContent=PL?'Camera ready ✅ Poori body frame me laao, phir Start':'Calibrate ho gaya ✅ Ab frame me aao, position lo';c.innerHTML=B('go()','▶ Start')+(PL?'':B('cal0()','Re-calibrate',1))}
  else c.innerHTML=B('sd()','⏹ Stop & Save')}
 async function cam(){try{ac=ac||new(window.AudioContext||window.webkitAudioContext)()}catch(x){}
  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:face,width:{ideal:320},height:{ideal:240}},audio:false});
- vd.srcObject=stream;await vd.play();ph=1;clearInterval(lp);lp=setInterval(tick,80);ui()}
+ vd.srcObject=stream;await vd.play();ph=1;ld=!PL&&!plErr;ui();if(ld){await loadPose();ld=false}ph=PL?3:1;clearInterval(lp);lp=setInterval(tick,80);ui()}
  catch(x){$('#st').textContent='❌ Camera nahi khula. Permission do, ya is link ko seedha Chrome/Safari me kholo.'}}
 function sw(){face=face=='user'?'environment':'user';stopCam();cam()}
 function cal0(){bg=null;bn=0;ph=2;calT=Date.now()+3000;ui()}
-function go(){ph=4;cnt=0;secs=0;win=[];stt=0;lt=Date.now();wasPr=false;warm=0;ui()}
+function go(){ps=null;ph=4;cnt=0;secs=0;win=[];stt=0;lt=Date.now();wasPr=false;warm=0;ui()}
 function ping(){try{const o=ac.createOscillator();o.connect(ac.destination);o.frequency.value=880;o.start();o.stop(ac.currentTime+.08)}catch(x){}try{navigator.vibrate&&navigator.vibrate(35)}catch(x){}}
 function tick(){if(!stream||vd.readyState<2)return;const cv=$('#cv');if(!cv)return;
  const e=EX.find(x=>x.id==op),c=cv.getContext('2d'),n=W*H;
- ox.drawImage(vd,0,0,W,H);const d=ox.getImageData(0,0,W,H).data;c.drawImage(vd,0,0,320,240);
+ c.drawImage(vd,0,0,320,240);if(PL&&ph>=3){poseTick(e,c);return}ox.drawImage(vd,0,0,W,H);const d=ox.getImageData(0,0,W,H).data;c.drawImage(vd,0,0,320,240);
  if(ph==2){if(!bg)bg=new Float32Array(n);for(let i=0;i<n;i++)bg[i]+=(d[i*4]+d[i*4+1]+d[i*4+2])/3;bn++;
   $('#st').textContent='Calibrate ho raha hai… hilo mat ('+Math.max(0,Math.ceil((calT-Date.now())/1000))+')';
   if(Date.now()>=calT){for(let i=0;i<n;i++)bg[i]/=bn;ph=3;ui()}return}
@@ -182,7 +183,7 @@ function tick(){if(!stream||vd.readyState<2)return;const cv=$('#cv');if(!cv)retu
  const m=mx2.createImageData(W,H);let cn=0,sy=0;
  for(let i=0;i<n;i++){const g=(d[i*4]+d[i*4+1]+d[i*4+2])/3;if(Math.abs(g-bg[i])>32){cn++;sy+=Math.floor(i/W);m.data[i*4]=255;m.data[i*4+1]=122;m.data[i*4+2]=69;m.data[i*4+3]=130}}
  mx2.putImageData(m,0,0);c.drawImage(mc,0,0,320,240);
- const pr=cn/n>.05;if(pr){sm=sm*.65+(sy/cn/H)*.35;c.fillStyle='#fff';c.fillRect(0,sm*240-1,320,2)}
+ const pr=cn/n>.05&&cn/n<.6;if(pr){sm=sm*.65+(sy/cn/H)*.35;c.fillStyle='#fff';c.fillRect(0,sm*240-1,320,2)}
  if(ph!=4)return;
  const now=Date.now();
  if(pr&&!wasPr){warm=now+1500;win=[];stt=0}if(!pr)win=[];wasPr=pr;
@@ -191,6 +192,32 @@ function tick(){if(!stream||vd.readyState<2)return;const cv=$('#cv');if(!cv)retu
   const mx=Math.max(...win),mn=Math.min(...win),a=mx-mn;
   if(a>.03){if(stt==0&&sm<mn+.3*a)stt=1;else if(stt==1&&sm>mx-.3*a&&now-lastRep>500){cnt++;lastRep=now;stt=0;ping()}}}
  $('#lc').textContent=cnt;$('#st').textContent=pr?'🟢 Dikh rahe ho — counting':'🔴 Frame me nahi dikh rahe — count ruka'}
+let ps=null,PL=null,plErr=false,ld=false;
+const V='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14',PT={push:[100,150],ohp:[100,150],ofp:[100,150],squat:[110,160],lunge:[110,160],pull:[90,150],ohpu:[90,150]},AM={sit:25,burpee:.2};
+const EL=[[11,13,15],[12,14,16]],KN=[[23,25,27],[24,26,28]],HP=[[11,23,25],[12,24,26]];
+const SK=[[11,13],[13,15],[12,14],[14,16],[11,12],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28]];
+async function loadPose(){if(PL||plErr)return;try{const m=await import(V+'/vision_bundle.mjs'),f=await m.FilesetResolver.forVisionTasks(V+'/wasm');
+ const mk=d=>m.PoseLandmarker.createFromOptions(f,{baseOptions:{modelAssetPath:'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',delegate:d},runningMode:'VIDEO',numPoses:1});
+ try{PL=await mk('GPU')}catch(x){PL=await mk('CPU')}}catch(x){plErr=true}}
+const AN=(a,b,c)=>{const x=a.x-b.x,y=a.y-b.y,p=c.x-b.x,q=c.y-b.y,d=Math.hypot(x,y)*Math.hypot(p,q);return d?Math.acos(Math.max(-1,Math.min(1,(x*p+y*q)/d)))*180/Math.PI:180};
+function val(e,L){const vi=i=>L[i].visibility||0,ang=s=>AN(L[s[0]],L[s[1]],L[s[2]]),ok=s=>Math.min(vi(s[0]),vi(s[1]),vi(s[2]))>.4;
+ const best=S=>{let b=null,bv=0;for(const s of S){const m=Math.min(vi(s[0]),vi(s[1]),vi(s[2]));if(m>bv){bv=m;b=s}}return bv>.4?ang(b):null};
+ const low=S=>{const r=S.filter(ok).map(ang);return r.length?Math.min(...r):null};
+ switch(e.id){case 'push':case 'ohp':case 'ofp':return best(EL);case 'squat':case 'wall':return best(KN);case 'lunge':return low(KN);case 'pull':case 'ohpu':return low(EL);case 'sit':return best(HP);
+ case 'burpee':return vi(0)>.4&&Math.max(vi(27),vi(28))>.3?(L[27].y+L[28].y)/2-L[0].y:null;
+ case 'plank':return Math.max(vi(11),vi(12))>.3&&Math.max(vi(27),vi(28))>.3?Math.abs((L[11].y+L[12].y)/2-(L[27].y+L[28].y)/2):null}return null}
+function poseTick(e,c){let L=null;try{const r=PL.detectForVideo(vd,performance.now());L=r.landmarks&&r.landmarks[0]}catch(x){}
+ const now=Date.now(),v=L?val(e,L):null,pr=v!=null,s=$('#st');
+ if(L){c.strokeStyle='#34d399';c.lineWidth=4;c.lineCap='round';for(const[a,b]of SK)if((L[a].visibility||0)>.4&&(L[b].visibility||0)>.4){c.beginPath();c.moveTo(L[a].x*320,L[a].y*240);c.lineTo(L[b].x*320,L[b].y*240);c.stroke()}}
+ if(ph!=4){s.textContent=pr?'🟢 Body dikh rahi hai — Start dabao':'🔴 Poori body frame me laao';return}
+ if(!pr){stt=0;lt=now;s.textContent='🔴 Body nahi dikh rahi — count ruka';return}
+ if(e.u=='sec'){const ok=e.id=='plank'?v<.2:(v>70&&v<125);if(ok)secs+=(now-lt)/1000;lt=now;cnt=Math.floor(secs);s.textContent=ok?'🟢 Sahi position — time chal raha':'🟡 Sahi position lo ('+(e.id=='plank'?'body seedhi':'ghutne 90°')+')'}
+ else{ps=ps==null?v:ps*.5+v*.5;const T=PT[e.id];
+  if(T){if(stt==0&&ps<T[0])stt=1;else if(stt==1&&ps>T[1]&&now-lastRep>400){cnt++;lastRep=now;stt=0;ping()}}
+  else{win.push(ps);if(win.length>50)win.shift();const mx=Math.max(...win),mn=Math.min(...win),a=mx-mn;
+   if(a>AM[e.id]){if(stt==0&&ps<mn+.3*a)stt=1;else if(stt==1&&ps>mx-.3*a&&now-lastRep>500){cnt++;lastRep=now;stt=0;ping()}}}
+  s.textContent='🟢 Counting'+(e.id=='burpee'?'':' · angle '+Math.round(ps)+'°')}
+ $('#lc').textContent=cnt}
 function sd(){const e=EX.find(x=>x.id==op),n=cnt;stopCam();ph=0;
  if(n>0){const t0=tgt(e),up=addLog(e,n),p=got(ds(0),e.id)/t0,r=rate(p);fb=`+${n} ${e.u} save! Rating: ${r[0]} — ${r[1]} (${Math.round(p*100)}%)`;sheet();if(e.gm&&gmChk(e))gmShow(e);else if(up)lu(e)}
  else{fb='Camera ne kuch count nahi kiya 😴 Phir try karo.';sheet()}}
