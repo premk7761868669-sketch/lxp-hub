@@ -2,12 +2,6 @@ import json, re, shutil, datetime
 from pathlib import Path
 R = Path(__file__).resolve().parent
 D = R / 'dist'
-# flat mode: files named a__b__c.txt are placed at a/b/c.txt (phone upload me folders nahi bante)
-for p in list(R.iterdir()):
-    if p.is_file() and '__' in p.name:
-        t = R.joinpath(*p.name.split('__'))
-        t.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy(str(p), str(t))
 vk = lambda s: tuple(int(x) for x in re.findall(r'\d+', s))
 if D.exists():
     shutil.rmtree(D)
