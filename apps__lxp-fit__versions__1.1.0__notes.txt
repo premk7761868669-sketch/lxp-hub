@@ -1,0 +1,1 @@
+Pose detection (MediaPipe) se counting: joints ke angle se rep count, skeleton overlay, phone hilne se count nahi hota.
