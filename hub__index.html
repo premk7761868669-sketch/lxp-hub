@@ -1,0 +1,8 @@
+<!DOCTYPE html><html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LXP Apps</title><style>
+:root{--bg:#f4f5fb;--c:#fff;--t:#14162b;--m:#6b6f8a}@media(prefers-color-scheme:dark){:root{--bg:#0d0f1c;--c:#171a2e;--t:#eef0ff;--m:#9aa0c3}}
+body{margin:0;background:var(--bg);color:var(--t);font:15px system-ui,sans-serif;padding:16px}.w{max-width:520px;margin:auto}
+a.c{display:flex;gap:12px;align-items:center;background:var(--c);border-radius:16px;padding:12px;margin:12px 0;color:inherit;text-decoration:none}
+img{width:56px;height:56px;border-radius:14px}small{color:var(--m)}b{display:block}
+</style></head><body><div class="w"><h1>LXP Apps</h1><div id="l"></div></div><script>
+fetch('registry.json',{cache:'no-store'}).then(r=>r.json()).then(a=>{document.getElementById('l').innerHTML=a.map(x=>'<a class="c" href="'+x.id+'/"><img src="'+x.id+'/icon-192.png" alt=""><span><b>'+x.name+' <small>v'+x.version+'</small></b><small>'+x.description+'</small></span></a>').join('')||'Abhi koi app nahi'}).catch(function(){});
+</script></body></html>
