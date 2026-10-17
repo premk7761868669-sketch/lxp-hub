@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://lxp-fit-hub.netlify.app/sitemap.xml
